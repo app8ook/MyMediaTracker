@@ -1,0 +1,179 @@
+* {
+    font-size: 12pt;
+}
+
+QMainWindow {
+    background-color: {bg};
+}
+
+/* Заголовки */
+QLabel {
+    background-color: {bg2};
+    color: {textborder};
+    border-radius: 10px;
+    padding: 3px;
+    border: 2px solid {bg2};
+}
+
+/* Кнопки */
+QPushButton {
+    background-color: {bg2};
+    color: {textborder};
+    border-radius: 10px;
+    padding: 6px 12px;
+    border: 2px solid {bg2};
+}
+
+QPushButton:hover {
+    background-color: {bg2};
+    border: 2px solid {textborder};
+}
+
+QPushButton:pressed {
+    background-color: {bg2};
+}
+
+QPushButton:checked {
+    border: 2px solid {textborder};
+    background-color: {bg2};
+}
+
+/* Списки (QListWidget) */
+QListWidget {
+    background-color: {bg2};
+    color: {textborder};
+    border-radius: 10px;
+    border: 2px solid {bg2};
+    padding: 5px;
+}
+
+/* Элементы списка */
+QListWidget::item {
+    background-color: {bg};
+    border-radius: 8px;
+    margin: 2px 0;
+    padding: 5px;
+    border: 2px solid {bg};
+}
+
+QListWidget::item:selected {
+    background-color: {activeobj};
+    color: {textborder};
+    border: 2px solid {textborder};
+}
+
+QListWidget:focus {
+    outline: none;
+}
+
+/* Скроллбар для списков */
+QScrollBar:vertical {
+    background: {textborder};
+    width: 12px;
+    margin: 0px 0px 0px 0px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical {
+    background: {textborder};
+    min-height: 20px;
+    border-radius: 6px;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 1px;
+}
+
+/* Побочные окна */
+QInputDialog, QDialog {
+    background-color: {bg};
+    color: {textborder};
+    border-radius: 10px;
+    border: 2px solid {bg};
+    padding: 5px;
+}
+
+QLineEdit, QComboBox {
+    background-color: {bg2};
+    color: {textborder};
+    border-radius: 10px;
+    padding: 6px;
+    font-size: 16px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: {bg};
+    color: {textborder};
+    border-radius: 10px;
+    border: none;
+    outline: none;
+    padding: 5px;
+}
+
+QComboBox QAbstractItemView::item {
+    background-color: transparent;
+    color: {textborder};
+    padding: 8px 24px;
+    margin: 4px 0;
+    border-radius: 6px;
+}
+
+QComboBox QAbstractItemView::item:selected {
+    background-color: {activeobj};
+    color: white;
+}
+
+QMessageBox {
+    background-color: {bg};
+    color: {textborder};
+    border-radius: 10px;
+    border: 2px solid {bg};
+    padding: 5px;
+}
+
+/* Чекбоксы в настройках */
+QCheckBox {
+    background-color: {bg2};
+    color: {textborder};
+    border-radius: 10px;
+    padding: 8px 20px;
+    border: 2px solid {bg2};
+}
+
+QCheckBox:checked {
+    background-color: {bg2};
+    border: 2px solid {textborder};
+}
+
+QCheckBox::indicator { 
+    image: none; 
+    width: 0; 
+    height: 0; 
+}
+
+/* Контекстное меню */
+QMenu {
+    background-color: {bg};
+    color: {textborder};
+    border-radius: 10px;
+    border: none;
+    outline: none;
+    padding: 5px;
+}
+
+QMenu::item {
+    background-color: transparent;
+    color: {textborder};
+    padding: 4px 15px;
+    margin: 6px 0;
+    border-radius: 6px;
+}
+
+QMenu::item:selected {
+    background-color: {activeobj};
+    color: {textborder};
+}
+
+QMenu::item:disabled {
+    color: {activeobj};
+}
