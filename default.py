@@ -5,7 +5,8 @@ DEFAULT_DATA = {
             "bg": "#444444",
             "bg2": "#333333",
             "textborder": "#FF6666",
-            "activeobj": "#555555"
+            "activeobj": "#555555",
+            "favcolor": "#FF9000"
         },
         "defaultCategory": "Фильмы",
         "visibleCategories": [
@@ -14,10 +15,12 @@ DEFAULT_DATA = {
             "Игры",
             "Аниме",
             "Манга",
-            "Книги"
+            "Книги",
+            "Прочее"
         ],
         "defaultResolution": "1024 x 768",
-        "autostart": False
+        "autostart": False,
+        "fontsize": "12"
     },
     "content": {
         "Фильмы": {
@@ -49,7 +52,12 @@ DEFAULT_DATA = {
             "В планах": [],
             "В процессе": [],
             "Готово": []
+        },
+        "Прочее": {
+            "В планах": [],
+            "В процессе": [],
+            "Готово": []
         }
     },
-    "ver": 0.1
+    "ver": 0.2
 }
