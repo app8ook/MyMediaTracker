@@ -1,5 +1,5 @@
 * {
-    font-size: 12pt;
+    font-size: {fontsize}pt;
 }
 
 QMainWindow {
@@ -50,7 +50,7 @@ QListWidget {
 /* Элементы списка */
 QListWidget::item {
     background-color: {bg};
-    border-radius: 8px;
+    border-radius: 10px;
     margin: 2px 0;
     padding: 5px;
     border: 2px solid {bg};
@@ -62,26 +62,46 @@ QListWidget::item:selected {
     border: 2px solid {textborder};
 }
 
+QListWidget::item[favorite="true"] {
+    color: {favcolor};
+    font-weight: bold;
+}
+
 QListWidget:focus {
     outline: none;
 }
 
-/* Скроллбар для списков */
+/* Вертикальный скроллбар */
 QScrollBar:vertical {
     background: {textborder};
-    width: 12px;
+    width: 8px;
     margin: 0px 0px 0px 0px;
-    border-radius: 6px;
+    border-radius: 10px;
 }
 
 QScrollBar::handle:vertical {
     background: {textborder};
     min-height: 20px;
-    border-radius: 6px;
+    border-radius: 10px;
 }
-
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 1px;
+}
+
+/* Горизонтальный скроллбар */
+QScrollBar:horizontal {
+    background: {textborder};
+    height: 8px;
+    margin: 0px 0px 0px 0px;
+    border-radius: 10px;
+}
+QScrollBar::handle:horizontal {
+    background: {textborder};
+    min-width: 20px;
+    border-radius: 10px;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 1px;
 }
 
 /* Побочные окна */
@@ -91,6 +111,14 @@ QInputDialog, QDialog {
     border-radius: 10px;
     border: 2px solid {bg};
     padding: 5px;
+}
+
+QPlainTextEdit, QTextEdit {
+    background-color: {bg2};
+    color: {textborder};
+    border-radius: 10px;
+    padding: 6px;
+    font-size: 16px;
 }
 
 QLineEdit, QComboBox {
@@ -115,7 +143,7 @@ QComboBox QAbstractItemView::item {
     color: {textborder};
     padding: 8px 24px;
     margin: 4px 0;
-    border-radius: 6px;
+    border-radius: 10px;
 }
 
 QComboBox QAbstractItemView::item:selected {
@@ -166,7 +194,7 @@ QMenu::item {
     color: {textborder};
     padding: 4px 15px;
     margin: 6px 0;
-    border-radius: 6px;
+    border-radius: 10px;
 }
 
 QMenu::item:selected {
