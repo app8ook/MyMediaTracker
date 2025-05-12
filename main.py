@@ -24,6 +24,30 @@ def user_data_path():
     os.makedirs(data_dir, exist_ok=True)
     return os.path.join(data_dir, DATA_FILE)
 
+class EditItemDialog(QtWidgets.QDialog):
+    def __init__(self, title, label, default_text='', ok_text='Сохранить', cancel_text='Отмена', parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+        layout = QtWidgets.QVBoxLayout(self)
+        self.label = QtWidgets.QLabel(label)
+        self.text_edit = QtWidgets.QPlainTextEdit()
+        self.text_edit.setPlainText(default_text)
+        self.text_edit.setMinimumHeight(40)
+        buttons = QtWidgets.QHBoxLayout()
+        self.btn_ok = QtWidgets.QPushButton(ok_text)
+        self.btn_cancel = QtWidgets.QPushButton(cancel_text)
+        buttons.addWidget(self.btn_ok)
+        buttons.addWidget(self.btn_cancel)
+        layout.addWidget(self.label)
+        layout.addWidget(self.text_edit)
+        layout.addLayout(buttons)
+        self.btn_ok.clicked.connect(self.accept)
+        self.btn_cancel.clicked.connect(self.reject)
+
+    def get_text(self):
+        return self.text_edit.toPlainText()
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -35,7 +59,8 @@ class MainWindow(QtWidgets.QMainWindow):
             'Игры': self.pushButton_3, 
             'Аниме': self.pushButton_4, 
             'Книги': self.pushButton_5, 
-            'Манга': self.pushButton_6}
+            'Манга': self.pushButton_6, 
+            'Прочее': self.pushButton_15}
 
         for lw in [self.listWidget, self.listWidget_2, self.listWidget_3]:
             lw.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
@@ -53,6 +78,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pushButton_4.setCheckable(True)
         self.pushButton_5.setCheckable(True)
         self.pushButton_6.setCheckable(True)
+        self.pushButton_15.setCheckable(True)
         self.category_group = QtWidgets.QButtonGroup()
         self.category_group.setExclusive(True)
 
@@ -68,20 +94,29 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ensure_valid_current_category()
         self.load_category(self.current_category)
 
+        #Категории
         self.pushButton.clicked.connect(lambda: self.change_category('Фильмы'))
         self.pushButton_2.clicked.connect(lambda: self.change_category('Сериалы'))
         self.pushButton_3.clicked.connect(lambda: self.change_category('Игры'))
         self.pushButton_4.clicked.connect(lambda: self.change_category('Аниме'))
         self.pushButton_5.clicked.connect(lambda: self.change_category('Книги'))
         self.pushButton_6.clicked.connect(lambda: self.change_category('Манга'))
+        self.pushButton_15.clicked.connect(lambda: self.change_category('Прочее'))
+        #Плюсики для добавления элементов в списки
         self.pushButton_10.clicked.connect(lambda: self.add_item_to_list(self.listWidget, 'В планах'))
         self.pushButton_11.clicked.connect(lambda: self.add_item_to_list(self.listWidget_2, 'В процессе'))
         self.pushButton_12.clicked.connect(lambda: self.add_item_to_list(self.listWidget_3, 'Готово'))
+
+        #Поиск
+        self.lineEdit_2.textChanged.connect(lambda text: self.filter_list(self.listWidget, text))
+        self.lineEdit_3.textChanged.connect(lambda text: self.filter_list(self.listWidget_2, text))
+        self.lineEdit_4.textChanged.connect(lambda text: self.filter_list(self.listWidget_3, text))
+
+        #Кнопки снизу
         self.pushButton_14.clicked.connect(self.export_json)
         self.pushButton_13.clicked.connect(self.import_json)
         self.pushButton_8.clicked.connect(self.import_from_txt)
         self.pushButton_9.clicked.connect(self.open_settings)
-
         self.lineEdit.setText(self.data.get('Profile', ''))
         self.lineEdit.textChanged.connect(self.on_profile_changed)
         self.pushButton_7.clicked.connect(self.save_data)
@@ -89,11 +124,16 @@ class MainWindow(QtWidgets.QMainWindow):
     def load_data(self):
         if os.path.exists(self.data_path):
             with open(self.data_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        from default import DEFAULT_DATA
+                data = json.load(f)
+            # Проверяем версию профиля
+            if data.get("ver") != DEFAULT_DATA["ver"]:
+                self.update_version_profile(data, DEFAULT_DATA["ver"])
+                with open(self.data_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=4)
+            return data
         new_data = DEFAULT_DATA.copy()
         with open(self.data_path, 'w', encoding='utf-8') as f:
-            json.dump(new_data, f, indent=4)
+            json.dump(new_data, f, ensure_ascii=False, indent=4)
         return new_data
 
     def save_data(self):
@@ -101,6 +141,33 @@ class MainWindow(QtWidgets.QMainWindow):
         with open(self.data_path, 'w', encoding='utf-8') as f:
             json.dump(self.data, f, ensure_ascii=False, indent=4)
         QtWidgets.QMessageBox.information(self, 'Успех', 'Данные сохранены!')
+
+    def add_item_to_list(self, list_widget, section_name):
+        dialog = EditItemDialog(
+            title='Добавление элемента',
+            label='Введите название:',
+            default_text='',
+            ok_text='Добавить',
+            cancel_text='Отмена',
+            parent=self
+        )
+        if dialog.exec_() == QtWidgets.QDialog.Accepted:
+            text = dialog.get_text().strip()
+            if text:
+                list_widget.addItem(text)
+
+    def edit_item_dialog(self, current_text):
+        dialog = EditItemDialog(
+            title='Редактирование элемента',
+            label='Измените название:',
+            default_text=current_text,
+            ok_text='Сохранить',
+            cancel_text='Отмена',
+            parent=self
+        )
+        if dialog.exec_() == QtWidgets.QDialog.Accepted:
+            return dialog.get_text()
+        return None
 
     def apply_window_size_from_settings(self):
         default_res = self.data.get('settings', {}).get('defaultResolution', '1024 x 800')
@@ -120,6 +187,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.data['settings']['autostart'] = new_settings['autostart']
             self.data['settings']['defaultCategory'] = new_settings['defaultCategory']
             self.data['settings']['defaultResolution'] = new_settings['defaultResolution']
+            self.data['settings']['fontsize'] = new_settings['fontsize']
             self.save_data()
 
             def set_autostart(enable=True):
@@ -166,12 +234,19 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_profile_changed(self, text):
         self.data['Profile'] = text
 
+    def filter_list(self, list_widget, text):
+        text = text.strip().lower()
+        for i in range(list_widget.count()):
+            item = list_widget.item(i)
+            item.setHidden(text not in item.text().lower())
+
     def update_current_category_data(self):
         content = self.data['content']
         cat = self.current_category
         content[cat]['В планах'] = [self.listWidget.item(i).text() for i in range(self.listWidget.count())]
         content[cat]['В процессе'] = [self.listWidget_2.item(i).text() for i in range(self.listWidget_2.count())]
         content[cat]['Готово'] = [self.listWidget_3.item(i).text() for i in range(self.listWidget_3.count())]
+        self.update_favorite_colors()
 
     def load_category(self, category):
         self.listWidget.clear()
@@ -185,6 +260,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.listWidget_2.addItem(item)
             for item in content[category]['Готово']:
                 self.listWidget_3.addItem(item)
+        self.update_favorite_colors()
 
     def change_category(self, category):
         self.update_current_category_data()
@@ -206,6 +282,21 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.information(self, 'Экспорт', 'Профиль успешно экспортирован!')
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, 'Ошибка', f'Не удалось экспортировать профиль:\n{e}')
+
+    def update_version_profile(self, data, ver):
+        if "favcolor" not in data["settings"]["colors"]:
+            data["settings"]["colors"]["favcolor"] = "#FF9000"
+
+        if "fontsize" not in data["settings"]:
+            data["settings"]["fontsize"] = "12"
+
+        if "Прочее" not in data["content"]:
+            data["content"]["Прочее"] = {
+                "В планах": [],
+                "В процессе": [],
+                "Готово": []
+            }
+        data["ver"] = ver
 
     def import_json(self):
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Импорт профиля из JSON', '', 'JSON Files (*.json);;All Files (*)')
@@ -233,9 +324,25 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, 'Ошибка', 'Структура файла не совпадает с профилем MyMediaTracker.')
             return
 
-        if 'ver' not in imported_data or imported_data['ver'] != DEFAULT_DATA['ver']:
-            QtWidgets.QMessageBox.warning(self, 'Ошибка', f"Версия профиля ({imported_data.get('ver')}) не совпадает с версией программы ({DEFAULT_DATA['ver']}).")
-            return
+        # Проверка версии профиля
+        imported_ver = imported_data.get('ver')
+        current_ver = DEFAULT_DATA['ver']
+        if imported_ver != current_ver:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setWindowTitle('Адаптация профиля')
+            msg.setText(
+                f"Версия профиля ({imported_ver}) не совпадает с версией программы ({current_ver}).\n"
+                "Хотите адаптировать профиль к новой версии?"
+            )
+            msg.setIcon(QtWidgets.QMessageBox.Question)
+            btn_yes = msg.addButton('Да', QtWidgets.QMessageBox.YesRole)
+            btn_no = msg.addButton('Нет', QtWidgets.QMessageBox.NoRole)
+            msg.exec_()
+            if msg.clickedButton() == btn_yes:
+                self.update_version_profile(self, imported_data, current_ver)
+            elif msg.clickedButton() == btn_no:
+                QtWidgets.QMessageBox.information(self, 'Импорт', 'Импорт отменён.')
+                return
 
         reply = QtWidgets.QMessageBox.question(self, 'Импорт профиля', 'Импортировать этот профиль? Текущие данные будут заменены.', QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
         if reply != QtWidgets.QMessageBox.Yes:
@@ -257,6 +364,17 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             QtWidgets.QMessageBox.information(self, 'Импорт', 'Изменения вступят в силу после перезапуска программы.')
 
+    def update_favorite_colors(self):
+        fav_color = self.data['settings']['colors'].get('favcolor', '#FF9000')
+        normal_color = self.data['settings']['colors']['textborder']
+        for lw in [self.listWidget, self.listWidget_2, self.listWidget_3]:
+            for i in range(lw.count()):
+                item = lw.item(i)
+                if item.text().startswith('★ '):
+                    item.setForeground(QColor(fav_color))
+                else:
+                    item.setForeground(QColor(normal_color))
+
     def open_context_menu(self, position):
         list_widget = self.sender()
         selected_items = list_widget.selectedItems()
@@ -268,6 +386,13 @@ class MainWindow(QtWidgets.QMainWindow):
         delete_action = menu.addAction(f'Удалить ({len(selected_items)})')
         copy_action = menu.addAction(f'Копировать ({len(selected_items)})')
         move_menu = menu.addMenu('Переместить в')
+        menu.addSeparator()
+        is_favorite = any(item.text().startswith('★ ') for item in selected_items)
+        if is_favorite:
+            favorite_action = menu.addAction('Убрать из избранного')
+        else:
+            favorite_action = menu.addAction('Добавить в избранное')
+        sort_action = menu.addAction('Сортировать по алфавиту')
         categories = self.data['settings']['visibleCategories']
         lists = ['В планах', 'В процессе', 'Готово']
 
@@ -284,10 +409,12 @@ class MainWindow(QtWidgets.QMainWindow):
             for item in selected_items:
                 row = list_widget.row(item)
                 list_widget.takeItem(row)
+
         elif action == copy_action:
             text_to_copy = '\n'.join([item.text() for item in selected_items])
             clipboard = QtWidgets.QApplication.clipboard()
             clipboard.setText(text_to_copy)
+
         elif action == edit_action:
             item = selected_items[0]
             old_text = item.text()
@@ -295,6 +422,29 @@ class MainWindow(QtWidgets.QMainWindow):
             if new_text and new_text.strip() and (new_text != old_text):
                 item.setText(new_text.strip())
                 self.update_current_category_data()
+
+        if action == favorite_action:
+            for item in selected_items:
+                text = item.text()
+                if is_favorite and text.startswith('★ '):
+                    # Убрать звёздочку
+                    item.setText(text[2:])
+                elif not is_favorite and not text.startswith('★ '):
+                    # Добавить звёздочку
+                    item.setText('★ ' + text)
+            self.update_current_category_data()
+            return
+
+        if action == sort_action:
+            items = [list_widget.item(i).text() for i in range(list_widget.count())]
+            favs = sorted([x for x in items if x.startswith('★ ')], key=lambda x: x.lower())
+            non_favs = sorted([x for x in items if not x.startswith('★ ')], key=lambda x: x.lower())
+            list_widget.clear()
+            for text in favs + non_favs:
+                list_widget.addItem(text)
+            self.update_current_category_data()
+            return
+
         elif action:
             parent_menu = action.parentWidget()
             if parent_menu and parent_menu.title() in categories and (action.text() in lists):
@@ -313,32 +463,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if target_category == self.current_category:
             self.load_category(target_category)
 
-    def add_item_to_list(self, list_widget, section_name):
-        dialog = QtWidgets.QInputDialog(self)
-        dialog.setWindowTitle('Добавление элемента')
-        dialog.setLabelText('Введите название:')
-        dialog.setOkButtonText('Добавить')
-        dialog.setCancelButtonText('Отмена')
-        dialog.setTextValue('')
-        dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        ok = dialog.exec_()
-        text = dialog.textValue()
-        if ok and text.strip():
-            list_widget.addItem(text.strip())
-
-    def edit_item_dialog(self, current_text):
-        dialog = QtWidgets.QInputDialog(self)
-        dialog.setWindowTitle('Редактирование элемента')
-        dialog.setLabelText('Измените название:')
-        dialog.setOkButtonText('Сохранить')
-        dialog.setCancelButtonText('Отмена')
-        dialog.setTextValue(current_text)
-        dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        ok = dialog.exec_()
-        text = dialog.textValue()
-        if ok:
-            return text
-
     def import_from_txt(self):
         file_path, _ = QFileDialog.getOpenFileName(self, 'Выберите TXT файл', '', 'TXT Files (*.txt)')
         if not file_path:
@@ -346,7 +470,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         dialog = QDialog(self)
         dialog.setWindowTitle('Импорт в список')
-        dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         main_layout = QVBoxLayout()
         list_combo = QComboBox()
         list_combo.addItems(['В планах', 'В процессе', 'Готово'])
@@ -397,7 +520,7 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.information(self, 'Импорт', f"Импортировано {added_count} элементов в список '{selected_list}'")
 
 class SettingsDialog(QtWidgets.QDialog):
-    COLOR_LABELS = {'bg': 'Основной фон', 'bg2': 'Вторичный фон', 'textborder': 'Текст и рамки', 'activeobj': 'Активное'}
+    COLOR_LABELS = {'bg': 'Основной фон', 'bg2': 'Вторичный фон', 'textborder': 'Текст и рамки', 'activeobj': 'Активное', 'favcolor': 'Избранное'}
 
     def __init__(self, settings, parent=None):
         super().__init__(parent)
@@ -407,7 +530,6 @@ class SettingsDialog(QtWidgets.QDialog):
 
         main_layout = QtWidgets.QVBoxLayout(self)
         flags = self.windowFlags()
-        self.setWindowFlags(flags & ~Qt.WindowContextHelpButtonHint)
         main_layout.addSpacing(20)
         color_title = QtWidgets.QLabel('Цвета интерфейса:')
         main_layout.addWidget(color_title)
@@ -436,7 +558,7 @@ class SettingsDialog(QtWidgets.QDialog):
         cat_title = QtWidgets.QLabel('Видимые категории:')
         main_layout.addWidget(cat_title)
         self.category_buttons = {}
-        all_categories = ['Фильмы', 'Сериалы', 'Игры', 'Аниме', 'Манга', 'Книги']
+        all_categories = ['Фильмы', 'Сериалы', 'Игры', 'Аниме', 'Манга', 'Книги', 'Прочее']
         visible = set(settings['settings'].get('visibleCategories', all_categories))
         cat_widget = QtWidgets.QWidget()
         cat_layout = QtWidgets.QHBoxLayout(cat_widget)
@@ -494,8 +616,22 @@ class SettingsDialog(QtWidgets.QDialog):
         self.autostart_btn.setCheckable(True)
         self.autostart_btn.setChecked(settings['settings'].get('autostart', False))
         main_layout.addWidget(self.autostart_btn)
-        main_layout.addSpacing(60)
+        main_layout.addSpacing(20)
 
+        font_label = QtWidgets.QLabel('Размер шрифта:')
+        main_layout.addWidget(font_label)
+        self.font_combo = QtWidgets.QComboBox()
+        self.font_combo.addItems(['Маленький', 'Средний', 'Большой'])
+        font_size_map = {'Маленький': '12', 'Средний': '13', 'Большой': '14'}
+        current_font_size = settings['settings'].get('fontsize', '12')
+        for name, size in font_size_map.items():
+            if size == current_font_size:
+                self.font_combo.setCurrentText(name)
+                break
+        main_layout.addWidget(self.font_combo)
+        main_layout.addSpacing(20)
+
+        main_layout.addSpacing(40)
         footer_layout = QtWidgets.QHBoxLayout()
         version_label = QtWidgets.QLabel(f"Версия: {DEFAULT_DATA['ver']}")
         footer_layout.addWidget(version_label)
@@ -542,22 +678,36 @@ class SettingsDialog(QtWidgets.QDialog):
         autostart = self.autostart_btn.isChecked()
         default_cat = self.default_cat_combo.currentText()
         default_resolution = self.resolution_combo.currentText()
-        return {'colors': colors, 'visibleCategories': visible, 'autostart': autostart, 'defaultCategory': default_cat, 'defaultResolution': default_resolution}
+        font_size_map = {'Маленький': '12', 'Средний': '13', 'Большой': '14'}
+        fontsize = font_size_map[self.font_combo.currentText()]
+        return {'colors': colors, 'visibleCategories': visible, 'autostart': autostart, 'defaultCategory': default_cat, 'defaultResolution': default_resolution, 'fontsize': fontsize}
 
 def load_qss():
     data_path = user_data_path()
     colors = DEFAULT_DATA['settings']['colors']
+    fontsize = DEFAULT_DATA['settings'].get('fontsize', '12')
+    favcolor = colors.get('favcolor', '#FF9000')
 
     if os.path.exists(data_path):
         with open(data_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             colors = data['settings']['colors']
-            
+            fontsize = data['settings'].get('fontsize', '12')
+            favcolor = colors.get('favcolor', '#FF9000')
+
     with open(resource_path(STYLE_FILE), encoding='utf-8') as f:
         qss = f.read()
-    for key, value in colors.items():
+
+    qss_vars = dict(colors)
+    qss_vars['fontsize'] = fontsize 
+    qss_vars['favcolor'] = favcolor
+
+    for key, value in qss_vars.items():
         qss = qss.replace(f'{{{key}}}', value)
     return qss
+
+appconf = QtWidgets.QApplication(sys.argv)
+appconf.setAttribute(Qt.AA_DisableWindowContextHelpButton)
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
