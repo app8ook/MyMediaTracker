@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1024</width>
-    <height>800</height>
+    <width>1007</width>
+    <height>689</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -39,7 +39,6 @@
       <property name="sizeConstraint">
        <enum>QLayout::SetNoConstraint</enum>
       </property>
-      
       <item>
        <widget class="QPushButton" name="pushButton">
         <property name="text">
@@ -47,7 +46,6 @@
         </property>
        </widget>
       </item>
-
       <item>
        <widget class="QPushButton" name="pushButton_2">
         <property name="text">
@@ -55,7 +53,6 @@
         </property>
        </widget>
       </item>
-
       <item>
        <widget class="QPushButton" name="pushButton_3">
         <property name="text">
@@ -63,7 +60,6 @@
         </property>
        </widget>
       </item>
-
       <item>
        <widget class="QPushButton" name="pushButton_4">
         <property name="text">
@@ -71,7 +67,6 @@
         </property>
        </widget>
       </item>
-
       <item>
        <widget class="QPushButton" name="pushButton_6">
         <property name="text">
@@ -79,7 +74,6 @@
         </property>
        </widget>
       </item>
-
       <item>
        <widget class="QPushButton" name="pushButton_5">
         <property name="text">
@@ -87,7 +81,13 @@
         </property>
        </widget>
       </item>
-
+      <item>
+       <widget class="QPushButton" name="pushButton_15">
+        <property name="text">
+         <string>Прочее</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </item>
     <item>
@@ -121,6 +121,19 @@
          <set>Qt::AlignCenter</set>
         </property>
        </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_8">
+      <item>
+       <widget class="QLineEdit" name="lineEdit_2"/>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="lineEdit_3"/>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="lineEdit_4"/>
       </item>
      </layout>
     </item>
