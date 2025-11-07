@@ -478,10 +478,6 @@ class MainWindow(QtWidgets.QMainWindow):
                         return False
             return True
 
-        if not check_structure(DEFAULT_DATA, imported_data):
-            QtWidgets.QMessageBox.warning(self, 'Ошибка', 'Структура файла не совпадает с профилем MyMediaTracker.')
-            return
-
         # Проверка версии профиля
         imported_ver = imported_data.get('ver')
         current_ver = DEFAULT_DATA['ver']
@@ -497,10 +493,14 @@ class MainWindow(QtWidgets.QMainWindow):
             btn_no = msg.addButton('Нет', QtWidgets.QMessageBox.NoRole)
             msg.exec_()
             if msg.clickedButton() == btn_yes:
-                self.update_version_profile(self, imported_data, current_ver)
+                self.update_version_profile(imported_data, current_ver)
             elif msg.clickedButton() == btn_no:
                 QtWidgets.QMessageBox.information(self, 'Импорт', 'Импорт отменён.')
                 return
+
+        if not check_structure(DEFAULT_DATA, imported_data):
+            QtWidgets.QMessageBox.warning(self, 'Ошибка', 'Структура файла не совпадает с профилем MyMediaTracker.')
+            return
 
         reply = QtWidgets.QMessageBox.question(self, 'Импорт профиля', 'Импортировать этот профиль? Текущие данные будут заменены.', QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
         if reply != QtWidgets.QMessageBox.Yes:
