@@ -12,6 +12,7 @@ DEFAULT_DATA = {
         "visibleCategories": [
             "Фильмы",
             "Сериалы",
+            "Мультфильмы",
             "Игры",
             "Аниме",
             "Манга",
@@ -20,7 +21,9 @@ DEFAULT_DATA = {
         ],
         "defaultResolution": "1024 x 768",
         "autostart": False,
-        "fontsize": "12"
+        "fontsize": "12",
+        "advancedblocks": False,
+        "autowrap": False,
     },
     "content": {
         "Фильмы": {
@@ -29,6 +32,11 @@ DEFAULT_DATA = {
             "Готово": []
         },
         "Сериалы": {
+            "В планах": [],
+            "В процессе": [],
+            "Готово": []
+        },
+        "Мультфильмы": {
             "В планах": [],
             "В процессе": [],
             "Готово": []
@@ -59,5 +67,5 @@ DEFAULT_DATA = {
             "Готово": []
         }
     },
-    "ver": 0.2
+    "ver": 0.3
 }

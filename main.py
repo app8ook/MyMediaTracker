@@ -1,8 +1,8 @@
 import json, sys, os, winreg
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtWidgets import QMenu, QDialog, QComboBox, QPushButton, QFileDialog, QVBoxLayout, QHBoxLayout
-from PyQt5.QtCore import Qt, QUrl
-from PyQt5.QtGui import QColor, QDesktopServices
+from PyQt5.QtCore import Qt, QUrl, QMimeData
+from PyQt5.QtGui import QColor, QDesktopServices, QDrag
 from default import DEFAULT_DATA
 
 DATA_FILE = 'data.json'
@@ -52,17 +52,30 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         uic.loadUi(resource_path(UI_FILE), self)
-
+        
         self.category_buttons = {
             'Фильмы': self.pushButton, 
-            'Сериалы': self.pushButton_2, 
+            'Сериалы': self.pushButton_2,
+            'Мультфильмы': self.pushButton_16,
             'Игры': self.pushButton_3, 
             'Аниме': self.pushButton_4, 
             'Книги': self.pushButton_5, 
             'Манга': self.pushButton_6, 
             'Прочее': self.pushButton_15}
 
+        self.data_path = user_data_path()
+        self.data = self.load_data()
+        self.enable_advanced_blocks = self.data['settings'].get('advancedblocks', False)
+        self.autowrap_enabled = self.data['settings'].get('autowrap', False)
+
         for lw in [self.listWidget, self.listWidget_2, self.listWidget_3]:
+            if self.autowrap_enabled:
+                lw.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+                lw.setWordWrap(True)
+            else:
+                lw.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # или Qt.ScrollBarAlwaysOn, по желанию
+                lw.setWordWrap(False)
+            lw.itemClicked.connect(self.toggle_spoiler)
             lw.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
             lw.setDragEnabled(True)
             lw.setAcceptDrops(True)
@@ -86,8 +99,6 @@ class MainWindow(QtWidgets.QMainWindow):
             btn.setCheckable(True)
             self.category_group.addButton(btn)
 
-        self.data_path = user_data_path()
-        self.data = self.load_data()
         self.apply_window_size_from_settings()
         self.current_category = self.data['settings']['defaultCategory']
         self.update_category_buttons_visibility()
@@ -97,6 +108,7 @@ class MainWindow(QtWidgets.QMainWindow):
         #Категории
         self.pushButton.clicked.connect(lambda: self.change_category('Фильмы'))
         self.pushButton_2.clicked.connect(lambda: self.change_category('Сериалы'))
+        self.pushButton_16.clicked.connect(lambda: self.change_category('Мультфильмы'))
         self.pushButton_3.clicked.connect(lambda: self.change_category('Игры'))
         self.pushButton_4.clicked.connect(lambda: self.change_category('Аниме'))
         self.pushButton_5.clicked.connect(lambda: self.change_category('Книги'))
@@ -120,6 +132,104 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lineEdit.setText(self.data.get('Profile', ''))
         self.lineEdit.textChanged.connect(self.on_profile_changed)
         self.pushButton_7.clicked.connect(self.save_data)
+
+        # --- Устанавливаем drag&drop для кнопок категорий ---
+        self.CategoryWidget.setAcceptDrops(True)
+        self._dragged_button = None
+
+        def start_drag(btn, event):
+            drag = QDrag(btn)
+            mime = QMimeData()
+            mime.setText(btn.objectName())
+            drag.setMimeData(mime)
+            drag.setPixmap(btn.grab())
+            drag.setHotSpot(event.pos())
+            drag.exec_(Qt.MoveAction)
+
+        def button_mouse_press(event, btn):
+            if event.button() == Qt.LeftButton:
+                btn._drag_start = event.pos()
+
+        def button_mouse_move(event, btn):
+            if event.buttons() & Qt.LeftButton and hasattr(btn, "_drag_start"):
+                if (event.pos() - btn._drag_start).manhattanLength() > QtWidgets.QApplication.startDragDistance():
+                    start_drag(btn, event)
+                    delattr(btn, "_drag_start")
+
+        # перехватываем события у кнопок
+        for btn in [self.pushButton, self.pushButton_2, self.pushButton_3, self.pushButton_4,
+                    self.pushButton_5, self.pushButton_6, self.pushButton_15, self.pushButton_16]:
+            original_press = btn.mousePressEvent
+            original_move = btn.mouseMoveEvent
+
+            def new_press(e, b=btn, orig=original_press):
+                button_mouse_press(e, b)
+                orig(e)  # <- вызываем оригинальный pressEvent
+
+            def new_move(e, b=btn, orig=original_move):
+                button_mouse_move(e, b)
+                orig(e)  # <- вызываем оригинальный moveEvent
+
+            btn.mousePressEvent = new_press
+            btn.mouseMoveEvent = new_move
+
+        # теперь — принимаем drop в CategoryWidget
+        layout = self.horizontalLayout_7
+
+        def category_drag_enter(event):
+            event.acceptProposedAction()
+
+        def category_drag_move(event):
+            event.acceptProposedAction()
+
+        def category_drop(event):
+            name = event.mimeData().text()
+            src_btn = self.findChild(QtWidgets.QPushButton, name)
+            if not src_btn:
+                return
+
+            pos = event.pos()
+            for i in range(layout.count()):
+                w = layout.itemAt(i).widget()
+                if w and w != src_btn and pos.x() < w.x() + w.width() / 2:
+                    layout.removeWidget(src_btn)
+                    layout.insertWidget(i, src_btn)
+                    break
+            else:
+                layout.removeWidget(src_btn)
+                layout.addWidget(src_btn)
+
+            # сохраняем порядок в настройках (без записи в файл)
+            order = [layout.itemAt(i).widget().text() for i in range(layout.count())]
+            self.data['settings']['visibleCategories'] = order
+            event.acceptProposedAction()
+
+        self.CategoryWidget.dragEnterEvent = category_drag_enter
+        self.CategoryWidget.dragMoveEvent = category_drag_move
+        self.CategoryWidget.dropEvent = category_drop
+
+        # --- Восстанавливаем порядок кнопок из visibleCategories ---
+        visible_order = self.data['settings'].get('visibleCategories', list(self.category_buttons.keys()))
+        layout = self.horizontalLayout_7
+
+        # очищаем layout
+        for i in reversed(range(layout.count())):
+            item = layout.itemAt(i)
+            if item:
+                layout.removeItem(item)
+
+        # добавляем кнопки в нужном порядке
+        for cat_name in visible_order:
+            btn = self.category_buttons.get(cat_name)
+            if btn:
+                layout.addWidget(btn)
+
+        self.update_category_buttons_visibility()
+
+    def update_category_buttons_visibility(self):
+        visible = set(self.data['settings'].get('visibleCategories', []))
+        for cat, btn in self.category_buttons.items():
+            btn.setVisible(cat in visible)
 
     def load_data(self):
         if os.path.exists(self.data_path):
@@ -154,7 +264,11 @@ class MainWindow(QtWidgets.QMainWindow):
         if dialog.exec_() == QtWidgets.QDialog.Accepted:
             text = dialog.get_text().strip()
             if text:
-                list_widget.addItem(text)
+                if self.enable_advanced_blocks and '#' in text:
+                    self.add_spoiler_item(list_widget, text)
+                else:
+                    display_text = text
+                    list_widget.addItem(display_text)
 
     def edit_item_dialog(self, current_text):
         dialog = EditItemDialog(
@@ -188,6 +302,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.data['settings']['defaultCategory'] = new_settings['defaultCategory']
             self.data['settings']['defaultResolution'] = new_settings['defaultResolution']
             self.data['settings']['fontsize'] = new_settings['fontsize']
+            self.data['settings']['advancedblocks'] = new_settings['advancedblocks']
+            self.data['settings']['autowrap'] = new_settings['autowrap']
             self.save_data()
 
             def set_autostart(enable=True):
@@ -243,9 +359,14 @@ class MainWindow(QtWidgets.QMainWindow):
     def update_current_category_data(self):
         content = self.data['content']
         cat = self.current_category
-        content[cat]['В планах'] = [self.listWidget.item(i).text() for i in range(self.listWidget.count())]
-        content[cat]['В процессе'] = [self.listWidget_2.item(i).text() for i in range(self.listWidget_2.count())]
-        content[cat]['Готово'] = [self.listWidget_3.item(i).text() for i in range(self.listWidget_3.count())]
+
+        def get_full(item):
+            return item.data(Qt.UserRole) or item.text()
+
+        content[cat]['В планах'] = [get_full(self.listWidget.item(i)) for i in range(self.listWidget.count())]
+        content[cat]['В процессе'] = [get_full(self.listWidget_2.item(i)) for i in range(self.listWidget_2.count())]
+        content[cat]['Готово'] = [get_full(self.listWidget_3.item(i)) for i in range(self.listWidget_3.count())]
+
         self.update_favorite_colors()
 
     def load_category(self, category):
@@ -255,12 +376,36 @@ class MainWindow(QtWidgets.QMainWindow):
         content = self.data['content']
         if category in content:
             for item in content[category]['В планах']:
-                self.listWidget.addItem(item)
+                self.add_spoiler_item(self.listWidget, item)
             for item in content[category]['В процессе']:
-                self.listWidget_2.addItem(item)
+                self.add_spoiler_item(self.listWidget_2, item)
             for item in content[category]['Готово']:
-                self.listWidget_3.addItem(item)
+                self.add_spoiler_item(self.listWidget_3, item)
         self.update_favorite_colors()
+
+    def add_spoiler_item(self, list_widget, text):
+        # text -- это всегда оригинал, например: "Wdw#Описание"
+        item = QtWidgets.QListWidgetItem(self.visual_spoiler_text(text, collapsed=True))
+        item.setData(Qt.UserRole, text)
+        list_widget.addItem(item)
+
+    def visual_spoiler_text(self, text, collapsed=True):
+        if self.enable_advanced_blocks and "#" in text:
+            title, desc = [x.strip() for x in text.split('#', 1)]
+            if collapsed:
+                return f"{title + ' ' * 10 + '▲'}"
+            else:
+                return f"{title + ' ' * 10 + '▼'}\n\n{desc}"
+        else:
+            return text
+
+    def toggle_spoiler(self, item):
+        original_text = item.data(Qt.UserRole)
+        if not (self.enable_advanced_blocks and "#" in (original_text or "")):
+            return
+        # Если уже раскрыт (есть перенос строки)
+        expanded = ("\n" in item.text())
+        item.setText(self.visual_spoiler_text(original_text, collapsed=expanded))
 
     def change_category(self, category):
         self.update_current_category_data()
@@ -289,6 +434,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if "fontsize" not in data["settings"]:
             data["settings"]["fontsize"] = "12"
+
+        if "advancedblocks" not in data["settings"]:
+            data["settings"]["advancedblocks"] = False
+
+        if "autowrap" not in data["settings"]:
+            data["settings"]["autowrap"] = False
+
+        if "Мультфильмы" not in data["content"]:
+            data["content"]["Мультфильмы"] = {
+                "В планах": [],
+                "В процессе": [],
+                "Готово": []
+            }
 
         if "Прочее" not in data["content"]:
             data["content"]["Прочее"] = {
@@ -417,11 +575,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         elif action == edit_action:
             item = selected_items[0]
-            old_text = item.text()
+            old_text = item.data(Qt.UserRole) or item.text()
             new_text = self.edit_item_dialog(old_text)
             if new_text and new_text.strip() and (new_text != old_text):
-                item.setText(new_text.strip())
-                self.update_current_category_data()
+                item.setData(Qt.UserRole, new_text.strip())
+                item.setText(self.visual_spoiler_text(new_text.strip(), collapsed=True))
+            self.update_current_category_data()
 
         if action == favorite_action:
             for item in selected_items:
@@ -471,9 +630,15 @@ class MainWindow(QtWidgets.QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle('Импорт в список')
         main_layout = QVBoxLayout()
+        
         list_combo = QComboBox()
         list_combo.addItems(['В планах', 'В процессе', 'Готово'])
         main_layout.addWidget(list_combo)
+
+        delimiter_combo = QComboBox()
+        delimiter_combo.addItems(['Через строку - элемент', 'Каждая строка - элемент'])
+        main_layout.addWidget(delimiter_combo)
+
         buttons_layout = QHBoxLayout()
         ok_button = QPushButton('OK')
         cancel_button = QPushButton('Отмена')
@@ -489,6 +654,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         selected_list = list_combo.currentText()
+        delimiter = delimiter_combo.currentText()
 
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -496,6 +662,22 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, 'Ошибка', f'Не удалось прочитать файл: {e}')
             return
+
+        items = []
+        if delimiter == 'Через строку - элемент':
+            buffer = []
+            for line in lines:
+                line = line.strip()
+                if line == '':
+                    if buffer:
+                        items.append('\n'.join(buffer))
+                        buffer = []
+                else:
+                    buffer.append(line)
+            if buffer:
+                items.append('\n'.join(buffer))
+        else:  # 'Каждая строка - элемент'
+            items = [line.strip() for line in lines if line.strip()]
 
         if selected_list == 'В планах':
             list_widget = self.listWidget
@@ -509,13 +691,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.update_current_category_data()
         added_count = 0
-        for line in lines:
-            line = line.strip()
-            if line:
-                list_widget.addItem(line)
-                if line not in self.data['content'][self.current_category][selected_list]:
-                    self.data['content'][self.current_category][selected_list].append(line)
-                added_count += 1
+        for item_text in items:
+            list_widget.addItem(item_text)
+            if item_text not in self.data['content'][self.current_category][selected_list]:
+                self.data['content'][self.current_category][selected_list].append(item_text)
+            added_count += 1
+
         self.load_category(self.current_category)
         QtWidgets.QMessageBox.information(self, 'Импорт', f"Импортировано {added_count} элементов в список '{selected_list}'")
 
@@ -526,7 +707,7 @@ class SettingsDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.setWindowTitle('Настройки')
         self.setModal(True)
-        self.resize(420, 480)
+        self.resize(900, 480)
 
         main_layout = QtWidgets.QVBoxLayout(self)
         flags = self.windowFlags()
@@ -558,7 +739,7 @@ class SettingsDialog(QtWidgets.QDialog):
         cat_title = QtWidgets.QLabel('Видимые категории:')
         main_layout.addWidget(cat_title)
         self.category_buttons = {}
-        all_categories = ['Фильмы', 'Сериалы', 'Игры', 'Аниме', 'Манга', 'Книги', 'Прочее']
+        all_categories = ['Фильмы', 'Сериалы', 'Мультфильмы', 'Игры', 'Аниме', 'Манга', 'Книги', 'Прочее']
         visible = set(settings['settings'].get('visibleCategories', all_categories))
         cat_widget = QtWidgets.QWidget()
         cat_layout = QtWidgets.QHBoxLayout(cat_widget)
@@ -610,14 +791,6 @@ class SettingsDialog(QtWidgets.QDialog):
         main_layout.addWidget(self.resolution_combo)
         main_layout.addSpacing(20)
 
-        other_title = QtWidgets.QLabel('Другие настройки:')
-        main_layout.addWidget(other_title)
-        self.autostart_btn = QtWidgets.QPushButton('Автозапуск')
-        self.autostart_btn.setCheckable(True)
-        self.autostart_btn.setChecked(settings['settings'].get('autostart', False))
-        main_layout.addWidget(self.autostart_btn)
-        main_layout.addSpacing(20)
-
         font_label = QtWidgets.QLabel('Размер шрифта:')
         main_layout.addWidget(font_label)
         self.font_combo = QtWidgets.QComboBox()
@@ -629,6 +802,25 @@ class SettingsDialog(QtWidgets.QDialog):
                 self.font_combo.setCurrentText(name)
                 break
         main_layout.addWidget(self.font_combo)
+        main_layout.addSpacing(20)
+
+        other_title = QtWidgets.QLabel('Другие настройки:')
+        main_layout.addWidget(other_title)
+        self.autostart_btn = QtWidgets.QPushButton('Автозапуск (Программа будет запускатся с системой)')
+        self.autostart_btn.setCheckable(True)
+        self.autostart_btn.setChecked(settings['settings'].get('autostart', False))
+        main_layout.addWidget(self.autostart_btn)
+
+        self.advBlocks_btn = QtWidgets.QPushButton('Блоки-спойлеры (Пример формата Заголовок#Описание)')
+        self.advBlocks_btn.setCheckable(True)
+        self.advBlocks_btn.setChecked(settings['settings'].get('advancedblocks', False))
+        main_layout.addWidget(self.advBlocks_btn)
+        
+        self.autowrap_btn = QtWidgets.QPushButton('Автоперенос (Отключение горизонтального скроллбара)')
+        self.autowrap_btn.setCheckable(True)
+        self.autowrap_btn.setChecked(settings['settings'].get('autowrap', False))
+        main_layout.addWidget(self.autowrap_btn)
+
         main_layout.addSpacing(20)
 
         main_layout.addSpacing(40)
@@ -676,11 +868,13 @@ class SettingsDialog(QtWidgets.QDialog):
         colors = {k: e.text() for k, e in self.color_edits.items()}
         visible = [cat for cat, btn in self.category_buttons.items() if btn.isChecked()]
         autostart = self.autostart_btn.isChecked()
+        advancedblocks = self.advBlocks_btn.isChecked()
+        autowrap = self.autowrap_btn.isChecked()
         default_cat = self.default_cat_combo.currentText()
         default_resolution = self.resolution_combo.currentText()
         font_size_map = {'Маленький': '12', 'Средний': '13', 'Большой': '14'}
         fontsize = font_size_map[self.font_combo.currentText()]
-        return {'colors': colors, 'visibleCategories': visible, 'autostart': autostart, 'defaultCategory': default_cat, 'defaultResolution': default_resolution, 'fontsize': fontsize}
+        return {'colors': colors, 'visibleCategories': visible, 'autostart': autostart, 'defaultCategory': default_cat, 'defaultResolution': default_resolution, 'fontsize': fontsize, 'advancedblocks': advancedblocks, 'autowrap': autowrap}
 
 def load_qss():
     data_path = user_data_path()

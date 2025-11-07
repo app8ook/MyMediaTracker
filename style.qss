@@ -44,7 +44,7 @@ QListWidget {
     color: {textborder};
     border-radius: 10px;
     border: 2px solid {bg2};
-    padding: 5px;
+    padding: 8px;
 }
 
 /* Элементы списка */
@@ -74,8 +74,8 @@ QListWidget:focus {
 /* Вертикальный скроллбар */
 QScrollBar:vertical {
     background: {textborder};
-    width: 8px;
-    margin: 0px 0px 0px 0px;
+    width: 12px;
+    margin: 3px 0px 3px 6px; /* сверху, справа, снизу, слева */
     border-radius: 10px;
 }
 
