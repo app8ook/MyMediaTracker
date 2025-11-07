@@ -518,7 +518,6 @@ class MainWindow(QtWidgets.QMainWindow):
         msg.exec_()
         if msg.clickedButton() == btn_yes:
             QtWidgets.qApp.quit()
-            self.restart_application()
         else:
             QtWidgets.QMessageBox.information(self, 'Импорт', 'Изменения вступят в силу после перезапуска программы.')
 
@@ -703,15 +702,17 @@ class MainWindow(QtWidgets.QMainWindow):
 class SettingsDialog(QtWidgets.QDialog):
     COLOR_LABELS = {'bg': 'Основной фон', 'bg2': 'Вторичный фон', 'textborder': 'Текст и рамки', 'activeobj': 'Активное', 'favcolor': 'Избранное'}
 
-    def __init__(self, settings, parent=None):
+    def __init__(self, settings, main_window, parent=None):
         super().__init__(parent)
         self.setWindowTitle('Настройки')
         self.setModal(True)
         self.resize(900, 480)
+        self.settings = settings
+        self.main_window = main_window  # сохраняем ссылку на главное окно
 
         main_layout = QtWidgets.QVBoxLayout(self)
         flags = self.windowFlags()
-        main_layout.addSpacing(20)
+        main_layout.addSpacing(10)
         color_title = QtWidgets.QLabel('Цвета интерфейса:')
         main_layout.addWidget(color_title)
         self.color_edits = {}
@@ -734,12 +735,12 @@ class SettingsDialog(QtWidgets.QDialog):
             btn.clicked.connect(lambda _, e=edit: self.pick_color(e))
 
         main_layout.addLayout(color_grid)
-        main_layout.addSpacing(20)
+        main_layout.addSpacing(10)
 
         cat_title = QtWidgets.QLabel('Видимые категории:')
         main_layout.addWidget(cat_title)
         self.category_buttons = {}
-        all_categories = ['Фильмы', 'Сериалы', 'Мультфильмы', 'Игры', 'Аниме', 'Манга', 'Книги', 'Прочее']
+        all_categories = ['Фильмы', 'Мультфильмы', 'Сериалы', 'Игры', 'Аниме', 'Манга', 'Книги', 'Прочее']
         visible = set(settings['settings'].get('visibleCategories', all_categories))
         cat_widget = QtWidgets.QWidget()
         cat_layout = QtWidgets.QHBoxLayout(cat_widget)
@@ -757,7 +758,7 @@ class SettingsDialog(QtWidgets.QDialog):
 
         main_layout.addWidget(cat_widget)
         self.on_category_button_toggled()
-        main_layout.addSpacing(20)
+        main_layout.addSpacing(10)
 
         defcat_label = QtWidgets.QLabel('Категория по умолчанию при запуске:')
         main_layout.addWidget(defcat_label)
@@ -773,7 +774,7 @@ class SettingsDialog(QtWidgets.QDialog):
         for btn in self.category_buttons.values():
             btn.toggled.connect(self.update_default_cat_combo)
 
-        main_layout.addSpacing(20)
+        main_layout.addSpacing(10)
 
         resolution_label = QtWidgets.QLabel('Разрешение окна программы при запуске:')
         main_layout.addWidget(resolution_label)
@@ -789,7 +790,7 @@ class SettingsDialog(QtWidgets.QDialog):
             self.resolution_combo.setCurrentIndex(1)
 
         main_layout.addWidget(self.resolution_combo)
-        main_layout.addSpacing(20)
+        main_layout.addSpacing(10)
 
         font_label = QtWidgets.QLabel('Размер шрифта:')
         main_layout.addWidget(font_label)
@@ -802,7 +803,7 @@ class SettingsDialog(QtWidgets.QDialog):
                 self.font_combo.setCurrentText(name)
                 break
         main_layout.addWidget(self.font_combo)
-        main_layout.addSpacing(20)
+        main_layout.addSpacing(10)
 
         other_title = QtWidgets.QLabel('Другие настройки:')
         main_layout.addWidget(other_title)
@@ -821,9 +822,12 @@ class SettingsDialog(QtWidgets.QDialog):
         self.autowrap_btn.setChecked(settings['settings'].get('autowrap', False))
         main_layout.addWidget(self.autowrap_btn)
 
-        main_layout.addSpacing(20)
+        self.reset_btn = QtWidgets.QPushButton('Очистка профиля (Полный сброс всего конфига настроек и данных)')
+        main_layout.addWidget(self.reset_btn)
+        self.reset_btn.clicked.connect(self.reset_profile)
+        main_layout.addSpacing(10)
 
-        main_layout.addSpacing(40)
+        main_layout.addSpacing(30)
         footer_layout = QtWidgets.QHBoxLayout()
         version_label = QtWidgets.QLabel(f"Версия: {DEFAULT_DATA['ver']}")
         footer_layout.addWidget(version_label)
@@ -840,6 +844,36 @@ class SettingsDialog(QtWidgets.QDialog):
         main_layout.addLayout(footer_layout)
         btn_box.accepted.connect(self.accept)
         btn_box.rejected.connect(self.reject)
+
+    def reset_profile(self):
+        msg = QtWidgets.QMessageBox(self)
+        msg.setWindowTitle('Подтверждение')
+        msg.setText('Вы уверены, что хотите сбросить профиль к настройкам по умолчанию?')
+        msg.setIcon(QtWidgets.QMessageBox.Question)
+        btn_yes = msg.addButton('Да', QtWidgets.QMessageBox.YesRole)
+        btn_no = msg.addButton('Нет', QtWidgets.QMessageBox.NoRole)
+        msg.exec_()
+        if msg.clickedButton() == btn_yes:
+            try:
+                os.remove(self.main_window.data_path)  # Удаляем файл с данными
+            except FileNotFoundError:
+                pass  # Если файл еще не существует, ничего страшного
+
+            msg2 = QtWidgets.QMessageBox(self)
+            msg2.setWindowTitle('Перезапуск')
+            msg2.setText('Профиль успешно сброшен!\nДля обновления интерфейса нужно перезапустить программу. Перезапустить сейчас?')
+            msg2.setIcon(QtWidgets.QMessageBox.Question)
+            btn_yes2 = msg2.addButton('Да', QtWidgets.QMessageBox.YesRole)
+            btn_no2 = msg2.addButton('Нет', QtWidgets.QMessageBox.NoRole)
+            msg2.exec_()
+            if msg2.clickedButton() == btn_yes2:
+                QtWidgets.qApp.quit()
+            else:
+                QtWidgets.QMessageBox.information(self, 'Сброс профиля', 'Изменения интерфейса вступят в силу после перезапуска программы.')
+
+        elif msg.clickedButton() == btn_no:
+            # Действия при нажатии «Нет»
+            QtWidgets.QMessageBox.information(self, 'Отмена', 'Сброс отменён')
 
     def on_category_button_toggled(self):
         checked = [btn for btn in self.category_buttons.values() if btn.isChecked()]
