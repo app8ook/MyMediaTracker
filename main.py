@@ -827,7 +827,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.reset_btn.clicked.connect(self.reset_profile)
         main_layout.addSpacing(10)
 
-        main_layout.addSpacing(30)
+        main_layout.addSpacing(25)
         footer_layout = QtWidgets.QHBoxLayout()
         version_label = QtWidgets.QLabel(f"Версия: {DEFAULT_DATA['ver']}")
         footer_layout.addWidget(version_label)
