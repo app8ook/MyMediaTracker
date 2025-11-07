@@ -518,7 +518,6 @@ class MainWindow(QtWidgets.QMainWindow):
         msg.exec_()
         if msg.clickedButton() == btn_yes:
             QtWidgets.qApp.quit()
-            self.restart_application()
         else:
             QtWidgets.QMessageBox.information(self, 'Импорт', 'Изменения вступят в силу после перезапуска программы.')
 
@@ -703,11 +702,13 @@ class MainWindow(QtWidgets.QMainWindow):
 class SettingsDialog(QtWidgets.QDialog):
     COLOR_LABELS = {'bg': 'Основной фон', 'bg2': 'Вторичный фон', 'textborder': 'Текст и рамки', 'activeobj': 'Активное', 'favcolor': 'Избранное'}
 
-    def __init__(self, settings, parent=None):
+    def __init__(self, settings, main_window, parent=None):
         super().__init__(parent)
         self.setWindowTitle('Настройки')
         self.setModal(True)
         self.resize(900, 480)
+        self.settings = settings
+        self.main_window = main_window  # сохраняем ссылку на главное окно
 
         main_layout = QtWidgets.QVBoxLayout(self)
         flags = self.windowFlags()
@@ -821,6 +822,10 @@ class SettingsDialog(QtWidgets.QDialog):
         self.autowrap_btn.setChecked(settings['settings'].get('autowrap', False))
         main_layout.addWidget(self.autowrap_btn)
 
+        self.reset_btn = QtWidgets.QPushButton('Очистка профиля (Полный сброс всего конфига настроек и данных)')
+        main_layout.addWidget(self.reset_btn)
+        self.reset_btn.clicked.connect(self.reset_profile)
+
         main_layout.addSpacing(20)
 
         main_layout.addSpacing(40)
@@ -840,6 +845,36 @@ class SettingsDialog(QtWidgets.QDialog):
         main_layout.addLayout(footer_layout)
         btn_box.accepted.connect(self.accept)
         btn_box.rejected.connect(self.reject)
+
+    def reset_profile(self):
+        msg = QtWidgets.QMessageBox(self)
+        msg.setWindowTitle('Подтверждение')
+        msg.setText('Вы уверены, что хотите сбросить профиль к настройкам по умолчанию?')
+        msg.setIcon(QtWidgets.QMessageBox.Question)
+        btn_yes = msg.addButton('Да', QtWidgets.QMessageBox.YesRole)
+        btn_no = msg.addButton('Нет', QtWidgets.QMessageBox.NoRole)
+        msg.exec_()
+        if msg.clickedButton() == btn_yes:
+            try:
+                os.remove(self.main_window.data_path)  # Удаляем файл с данными
+            except FileNotFoundError:
+                pass  # Если файл еще не существует, ничего страшного
+
+            msg2 = QtWidgets.QMessageBox(self)
+            msg2.setWindowTitle('Перезапуск')
+            msg2.setText('Профиль успешно сброшен!\nДля обновления интерфейса нужно перезапустить программу. Перезапустить сейчас?')
+            msg2.setIcon(QtWidgets.QMessageBox.Question)
+            btn_yes2 = msg2.addButton('Да', QtWidgets.QMessageBox.YesRole)
+            btn_no2 = msg2.addButton('Нет', QtWidgets.QMessageBox.NoRole)
+            msg2.exec_()
+            if msg2.clickedButton() == btn_yes2:
+                QtWidgets.qApp.quit()
+            else:
+                QtWidgets.QMessageBox.information(self, 'Сброс профиля', 'Изменения интерфейса вступят в силу после перезапуска программы.')
+
+        elif msg.clickedButton() == btn_no:
+            # Действия при нажатии «Нет»
+            QtWidgets.QMessageBox.information(self, 'Отмена', 'Сброс отменён')
 
     def on_category_button_toggled(self):
         checked = [btn for btn in self.category_buttons.values() if btn.isChecked()]
