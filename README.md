@@ -5,6 +5,10 @@ Utility that allows you to track planned, finished or media in the process, conv
 
 ![image](https://github.com/user-attachments/assets/8b53a88c-262d-4e88-b832-513e5970e7ec)
 
+Если вы хотите собрать программу сами, вот флаги Pyinstaller с которыми собираю я
+
+```pyinstaller --onefile -w --icon=Kosou.ico --name=MyMediaTracker --add-data "interface.ui;." --add-data "style.qss;." --add-data "Kosou.ico;." --add-data "default.py;." main.py```
+
 Этот проект лицензирован под MIT License - см. файл LICENSE.
 
 This project is licensed under the MIT License - see the LICENSE file.
